@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cargo build:*)",
+      "Bash(timeout 20 cargo run:*)",
+      "Bash(timeout 15 cargo run:*)",
+      "Bash(cargo run:*)",
+      "WebSearch",
+      "WebFetch(domain:www.gameaipro.com)",
+      "Bash(cargo check:*)",
+      "WebFetch(domain:bevy-cheatbook.github.io)",
+      "WebFetch(domain:docs.rs)",
+      "WebFetch(domain:github.com)",
+      "Bash(gh auth status:*)",
+      "Bash(winget install:*)",
+      "Bash(\"C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe\" auth status)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(dir:*)",
+      "Bash(findstr:*)"
+    ]
+  }
+}

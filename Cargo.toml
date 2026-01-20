@@ -1,0 +1,27 @@
+[package]
+name = "lunacid-clone"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Core engine
+bevy = { version = "0.15", features = ["dynamic_linking"] }
+
+# Physics
+bevy_rapier3d = "0.28"
+
+# Audio
+bevy_kira_audio = { version = "0.21", features = ["ogg", "wav"] }
+
+# Serialization for save/load and data files
+serde = { version = "1.0", features = ["derive"] }
+ron = "0.8"
+
+# Random number generation
+rand = "0.8"
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
