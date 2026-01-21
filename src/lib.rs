@@ -20,6 +20,7 @@
 
 pub mod combat;
 pub mod core;
+pub mod enemies;
 pub mod player;
 pub mod rendering;
 pub mod ui;
@@ -48,6 +49,9 @@ impl Plugin for LunacidPlugin {
 
             // Combat systems
             .add_plugins(combat::CombatPlugin)
+
+            // Enemy systems
+            .add_plugins(enemies::EnemyPlugin)
 
             // World systems
             .add_plugins(world::WorldPlugin)

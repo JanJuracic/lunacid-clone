@@ -5,6 +5,7 @@ use bevy_rapier3d::prelude::*;
 
 use super::components::*;
 use crate::core::{GameState, PlayState};
+use crate::enemies::{Enemy, EnemyStats, AttackHitEvent};
 use crate::player::{Player, PlayerCamera};
 
 /// System set ordering for combat.
@@ -68,6 +69,7 @@ pub fn setup_combat_systems(app: &mut App) {
             Update,
             (
                 process_attack_hits,
+                process_enemy_attack_hits,
                 apply_damage,
                 check_deaths,
             )
@@ -120,6 +122,7 @@ fn stamina_regen(time: Res<Time>, mut query: Query<&mut Stamina>) {
 fn execute_attack(
     mut commands: Commands,
     mut query: Query<(Entity, &Transform, &mut CombatState, &mut Stamina, &Weapon), With<Player>>,
+    enemy_query: Query<Entity, With<Enemy>>,
     mut attack_events: EventWriter<AttackEvent>,
     rapier_context: Query<&RapierContext>,
 ) {
@@ -159,28 +162,36 @@ fn execute_attack(
         direction,
     });
 
-    // Raycast for hit detection
+    // Sphere overlap for hit detection (better for melee combat)
     if let Ok(context) = rapier_context.get_single() {
-        let ray_origin = transform.translation + Vec3::Y * 0.5; // Eye level
-        let ray_dir = direction;
-        let max_dist = weapon.reach;
+        // Position the sphere slightly in front of the player
+        let sphere_center = transform.translation + direction * (weapon.reach * 0.5) + Vec3::Y * 0.5;
+        let sphere_radius = weapon.reach * 0.6;
 
-        if let Some((hit_entity, _toi)) = context.cast_ray(
-            ray_origin,
-            ray_dir,
-            max_dist,
-            true,
+        // Use shape intersection for sphere overlap
+        let shape = Collider::ball(sphere_radius);
+        let shape_pos = sphere_center;
+        let shape_rot = Quat::IDENTITY;
+
+        context.intersections_with_shape(
+            shape_pos,
+            shape_rot,
+            &shape,
             QueryFilter::default().exclude_collider(player_entity),
-        ) {
-            // We hit something - spawn a damage event
-            commands.send_event(DamageEvent {
-                target: hit_entity,
-                source: player_entity,
-                amount: damage,
-                element: weapon.element,
-                knockback: direction * 2.0,
-            });
-        }
+            |hit_entity| {
+                // Only damage enemies
+                if enemy_query.get(hit_entity).is_ok() {
+                    commands.send_event(DamageEvent {
+                        target: hit_entity,
+                        source: player_entity,
+                        amount: damage,
+                        element: weapon.element,
+                        knockback: direction * 2.0,
+                    });
+                }
+                true // Continue checking other entities
+            },
+        );
     }
 
     // Set cooldown - is_attacking will be reset by update_cooldowns
@@ -232,6 +243,42 @@ fn process_attack_hits(
         // Trigger combat feedback
         screen_shake.shake(0.1, 0.15);
         hit_stop.trigger(0.05);
+    }
+}
+
+/// Process enemy attack hits (from animation hit frame).
+fn process_enemy_attack_hits(
+    mut commands: Commands,
+    mut attack_hit_events: EventReader<AttackHitEvent>,
+    enemy_query: Query<(Entity, &Transform, &EnemyStats), With<Enemy>>,
+    player_query: Query<(Entity, &Transform), With<Player>>,
+) {
+    let Ok((player_entity, player_transform)) = player_query.get_single() else {
+        return;
+    };
+
+    for event in attack_hit_events.read() {
+        let Ok((enemy_entity, enemy_transform, stats)) = enemy_query.get(event.attacker) else {
+            continue;
+        };
+
+        // Check if player is still in attack range
+        let distance = enemy_transform.translation.distance(player_transform.translation);
+        if distance > stats.attack_range {
+            continue;
+        }
+
+        // Calculate knockback direction
+        let direction = (player_transform.translation - enemy_transform.translation).normalize_or_zero();
+
+        // Send damage event to player
+        commands.send_event(DamageEvent {
+            target: player_entity,
+            source: enemy_entity,
+            amount: event.damage,
+            element: Element::Physical,
+            knockback: direction * 2.0,
+        });
     }
 }
 
@@ -299,15 +346,17 @@ fn check_deaths(
     mut commands: Commands,
     mut death_events: EventReader<DeathEvent>,
     player_query: Query<Entity, With<Player>>,
+    enemy_query: Query<Entity, With<Enemy>>,
     mut next_state: ResMut<NextState<GameState>>,
 ) {
     for event in death_events.read() {
-        // Check if player died
         if player_query.get(event.entity).is_ok() {
             info!("Player died! Transitioning to Game Over...");
             next_state.set(GameState::GameOver);
+        } else if enemy_query.get(event.entity).is_ok() {
+            // Skip enemies - handled by enemy death system with animation
         } else {
-            // Non-player entity died - despawn
+            // Non-player, non-enemy entity died - despawn
             commands.entity(event.entity).despawn_recursive();
         }
     }

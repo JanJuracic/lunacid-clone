@@ -4,6 +4,7 @@ use bevy::prelude::*;
 use bevy_rapier3d::prelude::Collider;
 
 use crate::core::GameState;
+use crate::enemies::SpawnZone;
 use crate::player::spawn_player;
 
 /// World plugin - handles level loading and world setup.
@@ -35,7 +36,7 @@ const WALL_THICKNESS: f32 = 0.5;
 const DOOR_WIDTH: f32 = 2.5;
 
 /// Set up the dungeon level with multiple rooms.
-fn setup_dungeon(
+pub fn setup_dungeon(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -177,6 +178,18 @@ fn setup_dungeon(
     spawn_light(&mut commands, great_hall + Vec3::new(-4.0, 2.5, -3.0), 30000.0, false);
     spawn_light(&mut commands, great_hall + Vec3::new(4.0, 2.5, -3.0), 30000.0, false);
 
+    // Spawn zone for orcs in great hall
+    commands.spawn((
+        SpawnZone {
+            enemy_type: "orc".to_string(),
+            half_extents: Vec3::new(4.0, 0.0, 4.0),
+            max_enemies: 2,
+            spawn_delay: 0.0,
+        },
+        Transform::from_translation(great_hall),
+        LevelGeometry,
+    ));
+
     // =========================================================================
     // ROOM 4: East Chamber - 8x8
     // =========================================================================
@@ -204,6 +217,18 @@ fn setup_dungeon(
     );
 
     spawn_light(&mut commands, east_room + Vec3::new(0.0, 3.0, 0.0), 60000.0, true);
+
+    // Spawn zone for orcs in east chamber
+    commands.spawn((
+        SpawnZone {
+            enemy_type: "orc".to_string(),
+            half_extents: Vec3::new(2.5, 0.0, 2.5),
+            max_enemies: 1,
+            spawn_delay: 0.0,
+        },
+        Transform::from_translation(east_room),
+        LevelGeometry,
+    ));
 
     // =========================================================================
     // ROOM 5: West Chamber - 8x10
@@ -240,6 +265,18 @@ fn setup_dungeon(
     spawn_light(&mut commands, west_room + Vec3::new(0.0, 3.0, 0.0), 60000.0, true);
     spawn_light(&mut commands, west_room + Vec3::new(0.0, 2.5, -2.5), 20000.0, false);
     spawn_light(&mut commands, west_room + Vec3::new(0.0, 2.5, 2.5), 20000.0, false);
+
+    // Spawn zone for orcs in west chamber
+    commands.spawn((
+        SpawnZone {
+            enemy_type: "orc".to_string(),
+            half_extents: Vec3::new(2.5, 0.0, 3.0),
+            max_enemies: 1,
+            spawn_delay: 0.0,
+        },
+        Transform::from_translation(west_room),
+        LevelGeometry,
+    ));
 }
 
 /// Direction for doorways.

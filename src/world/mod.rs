@@ -2,4 +2,4 @@
 
 mod plugin;
 
-pub use plugin::WorldPlugin;
+pub use plugin::{setup_dungeon, WorldPlugin};
