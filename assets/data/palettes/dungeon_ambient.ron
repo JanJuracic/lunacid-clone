@@ -1,0 +1,14 @@
+(
+    tiles: {
+        // Main lights (bright, with shadows)
+        'L': ( lights: [( height: 3.0, intensity: 120000.0, shadows: true, color: (1.0, 0.8, 0.6), range: 20.0 )] ),
+        // Secondary lights (medium brightness, with shadows)
+        'M': ( lights: [( height: 3.0, intensity: 100000.0, shadows: true, color: (1.0, 0.8, 0.6), range: 18.0 )] ),
+        // Corridor lights
+        'c': ( lights: [( height: 2.5, intensity: 40000.0, shadows: false, color: (1.0, 0.7, 0.5), range: 12.0 )] ),
+        // Corner/fill lights (dimmer, no shadows)
+        'l': ( lights: [( height: 2.5, intensity: 30000.0, shadows: false, color: (1.0, 0.8, 0.6), range: 10.0 )] ),
+        // Chamber main lights (medium with shadows)
+        'C': ( lights: [( height: 3.0, intensity: 60000.0, shadows: true, color: (1.0, 0.8, 0.6), range: 15.0 )] ),
+    }
+)

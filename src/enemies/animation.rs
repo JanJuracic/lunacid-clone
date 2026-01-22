@@ -217,7 +217,12 @@ pub fn sync_animation_state(
             AiState::Chasing => AnimationState::Walking,
             AiState::Attacking => {
                 // Check if in attack range for combat idle vs attacking
-                let distance = enemy_transform.translation.distance(player_transform.translation);
+                // Use horizontal distance (consistent with AI systems)
+                let distance = Vec3::new(
+                    enemy_transform.translation.x - player_transform.translation.x,
+                    0.0,
+                    enemy_transform.translation.z - player_transform.translation.z,
+                ).length();
                 if distance <= stats.attack_range {
                     // The actual attack animation is triggered separately
                     AnimationState::CombatIdle

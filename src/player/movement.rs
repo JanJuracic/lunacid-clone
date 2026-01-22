@@ -229,6 +229,11 @@ pub fn spawn_player(commands: &mut Commands, position: Vec3) -> Entity {
         parent
             .spawn((
                 Camera3d::default(),
+                Camera {
+                    // Twilight sky clear color
+                    clear_color: ClearColorConfig::Custom(Color::srgb(0.08, 0.06, 0.12)),
+                    ..default()
+                },
                 PlayerCamera::default(),
                 // Position camera at "eye level" relative to player
                 Transform::from_xyz(0.0, 0.4, 0.0),

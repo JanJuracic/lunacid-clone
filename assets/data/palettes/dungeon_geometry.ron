@@ -1,0 +1,12 @@
+(
+    tiles: {
+        '.': ( kind: Floor, material: Some("stone") ),
+        '#': ( kind: Wall, material: Some("stone") ),
+        'P': ( kind: Pillar, material: Some("stone") ),
+        '+': ( kind: Doorway, material: Some("stone") ),
+        '_': ( kind: Void ),
+        'w': ( kind: Floor, material: Some("wood") ),
+        'W': ( kind: Wall, material: Some("wood"), height: Some(3.0) ),
+        'm': ( kind: Floor, material: Some("metal") ),
+    }
+)

@@ -5,9 +5,7 @@ use bevy::prelude::*;
 use super::ai;
 use super::animation;
 use super::data::{load_enemy_definitions, EnemyRegistry};
-use super::spawning::spawn_enemies_in_zones;
 use crate::core::GameState;
-use crate::world::setup_dungeon;
 
 /// Enemy plugin - handles enemy spawning, AI, death, and animations.
 pub struct EnemyPlugin;
@@ -18,14 +16,8 @@ impl Plugin for EnemyPlugin {
             .init_resource::<EnemyRegistry>()
             // Register animation events
             .add_event::<animation::AttackHitEvent>()
-            // Load definitions and spawn enemies once when entering the game
-            // Must run after setup_dungeon so spawn zones exist
-            .add_systems(
-                OnEnter(GameState::InGame),
-                (load_enemy_definitions, spawn_enemies_in_zones)
-                    .chain()
-                    .after(setup_dungeon),
-            )
+            // Load enemy definitions at startup (before level loading needs them)
+            .add_systems(Startup, load_enemy_definitions)
             // AI systems run during gameplay
             .add_systems(
                 Update,
