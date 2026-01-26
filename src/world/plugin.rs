@@ -5,6 +5,7 @@ use bevy::prelude::*;
 use crate::core::GameState;
 use crate::enemies::data::EnemyRegistry;
 use crate::player::spawn_player;
+use crate::rendering::VisualConfig;
 
 use super::builder::{build_level_from_data, LevelGeometry};
 use super::data::{load_level_definitions, load_palette_files, CurrentLevel, LevelRegistry};
@@ -32,6 +33,7 @@ pub fn setup_level(
     current_level: Res<CurrentLevel>,
     asset_server: Res<AssetServer>,
     enemy_registry: Res<EnemyRegistry>,
+    visual_config: Res<VisualConfig>,
 ) {
     let Some(level) = level_registry.get(&current_level.name) else {
         error!("Level '{}' not found in registry!", current_level.name);
@@ -47,9 +49,10 @@ pub fn setup_level(
         level,
         &asset_server,
         &enemy_registry,
+        &visual_config,
     );
 
-    spawn_player(&mut commands, player_pos);
+    spawn_player(&mut commands, player_pos, &visual_config);
 }
 
 /// Clean up level entities when leaving InGame state.

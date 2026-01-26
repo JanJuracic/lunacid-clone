@@ -1,6 +1,7 @@
 //! Level construction from data definitions.
 
 use bevy::prelude::*;
+use bevy::pbr::NotShadowCaster;
 use bevy_rapier3d::prelude::*;
 use std::collections::HashMap;
 
@@ -9,6 +10,7 @@ use crate::combat::Health;
 use crate::enemies::animation::NeedsAnimationSetup;
 use crate::enemies::data::EnemyRegistry;
 use crate::enemies::{AiState, AttackTimer, Enemy, EnemyType};
+use crate::rendering::VisualConfig;
 
 /// Marker for all level geometry that should be cleaned up.
 #[derive(Component)]
@@ -25,41 +27,41 @@ impl MaterialRegistry {
     pub fn new(materials: &mut Assets<StandardMaterial>) -> Self {
         let mut registry = HashMap::new();
 
-        // Stone material (default)
+        // Stone material (default) - desaturated grey-brown
         registry.insert(
             "stone".to_string(),
             materials.add(StandardMaterial {
-                base_color: Color::srgb(0.3, 0.3, 0.35),
+                base_color: Color::srgb(0.28, 0.27, 0.26),
                 perceptual_roughness: 0.9,
                 ..default()
             }),
         );
 
-        // Stone wall material
+        // Stone wall material - desaturated grey-brown
         registry.insert(
             "stone_wall".to_string(),
             materials.add(StandardMaterial {
-                base_color: Color::srgb(0.4, 0.35, 0.3),
+                base_color: Color::srgb(0.32, 0.30, 0.28),
                 perceptual_roughness: 0.8,
                 ..default()
             }),
         );
 
-        // Wood material
+        // Wood material - muted brown
         registry.insert(
             "wood".to_string(),
             materials.add(StandardMaterial {
-                base_color: Color::srgb(0.45, 0.32, 0.2),
+                base_color: Color::srgb(0.35, 0.30, 0.25),
                 perceptual_roughness: 0.7,
                 ..default()
             }),
         );
 
-        // Metal material
+        // Metal material - desaturated grey
         registry.insert(
             "metal".to_string(),
             materials.add(StandardMaterial {
-                base_color: Color::srgb(0.5, 0.5, 0.55),
+                base_color: Color::srgb(0.42, 0.42, 0.44),
                 perceptual_roughness: 0.3,
                 metallic: 0.8,
                 ..default()
@@ -68,49 +70,50 @@ impl MaterialRegistry {
 
         let mut ceilings = HashMap::new();
 
-        // Default ceiling material
+        // Default ceiling material - dark desaturated
         ceilings.insert(
             "ceiling".to_string(),
             materials.add(StandardMaterial {
-                base_color: Color::srgb(0.25, 0.25, 0.3),
+                base_color: Color::srgb(0.22, 0.21, 0.20),
                 perceptual_roughness: 0.9,
                 ..default()
             }),
         );
 
-        // Stone ceiling material
+        // Stone ceiling material - desaturated grey
         ceilings.insert(
             "stone_ceiling".to_string(),
             materials.add(StandardMaterial {
-                base_color: Color::srgb(0.35, 0.35, 0.4),
+                base_color: Color::srgb(0.28, 0.27, 0.26),
                 perceptual_roughness: 0.85,
                 ..default()
             }),
         );
 
-        // Wood ceiling material
+        // Wood ceiling material - muted brown
         ceilings.insert(
             "wood_ceiling".to_string(),
             materials.add(StandardMaterial {
-                base_color: Color::srgb(0.4, 0.28, 0.18),
+                base_color: Color::srgb(0.32, 0.28, 0.24),
                 perceptual_roughness: 0.75,
                 ..default()
             }),
         );
 
-        // Skylight material (brighter, slightly emissive)
+        // Skylight material - desaturated, dimmer
         ceilings.insert(
             "skylight".to_string(),
             materials.add(StandardMaterial {
-                base_color: Color::srgb(0.6, 0.65, 0.7),
+                base_color: Color::srgb(0.45, 0.44, 0.43),
                 perceptual_roughness: 0.5,
-                emissive: LinearRgba::new(0.1, 0.12, 0.15, 1.0),
+                emissive: LinearRgba::new(0.08, 0.08, 0.08, 1.0),
                 ..default()
             }),
         );
 
+        // Pillar material - desaturated grey-brown
         let pillar = materials.add(StandardMaterial {
-            base_color: Color::srgb(0.5, 0.45, 0.4),
+            base_color: Color::srgb(0.38, 0.36, 0.34),
             perceptual_roughness: 0.7,
             ..default()
         });
@@ -164,6 +167,7 @@ pub fn build_level_from_data(
     level: &LevelDefinition,
     asset_server: &AssetServer,
     enemy_registry: &EnemyRegistry,
+    visual_config: &VisualConfig,
 ) -> Vec3 {
     let mat_registry = MaterialRegistry::new(materials);
     let tile_size = level.tile_size;
@@ -179,11 +183,11 @@ pub fn build_level_from_data(
         brightness: level.global_ambient.brightness,
     });
 
-    // Set up directional light (moonlight from above)
+    // Set up directional light (moonlight)
     commands.spawn((
         DirectionalLight {
-            color: Color::srgb(0.6, 0.7, 0.9), // Pale blue-silver moonlight
-            illuminance: 2000.0,               // Dim moonlight intensity
+            color: Color::srgb(0.7, 0.7, 0.75), // Desaturated pale grey-blue
+            illuminance: 2000.0,                 // Subtle moonlight level
             shadows_enabled: true,
             ..default()
         },
@@ -199,7 +203,7 @@ pub fn build_level_from_data(
     // Set up sky sphere (gradient from horizon to zenith)
     let level_center_x = (level.width as f32 * tile_size) / 2.0;
     let level_center_z = (level.height as f32 * tile_size) / 2.0;
-    spawn_sky_sphere(commands, meshes, materials, Vec3::new(level_center_x, 0.0, level_center_z));
+    spawn_sky_sphere(commands, meshes, materials, Vec3::new(level_center_x, 0.0, level_center_z), visual_config.sky_color);
 
     // Process each tile
     for z in 0..level.height as i32 {
@@ -536,14 +540,15 @@ fn spawn_sky_sphere(
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
     center: Vec3,
+    sky_color: (f32, f32, f32),
 ) {
     let sky_radius = 500.0;
 
-    // Night sky material - dark blue with slight emission so it's visible
+    // Horror sky material - color from config for seamless blend with fog
     // Unlit appearance achieved through high emissive, zero base color
     let sky_material = materials.add(StandardMaterial {
         base_color: Color::BLACK,
-        emissive: LinearRgba::new(0.15, 0.12, 0.2, 1.0), // Purple-ish twilight
+        emissive: LinearRgba::new(sky_color.0, sky_color.1, sky_color.2, 1.0),
         unlit: true,
         cull_mode: None, // Render both sides so inside of sphere is visible
         ..default()
@@ -583,6 +588,6 @@ fn spawn_sky_sphere(
         Transform::from_translation(center),
         SkySphere,
         LevelGeometry,
-        // NotShadowCaster is applied via the unlit material - shadows won't be cast
+        NotShadowCaster, // Prevent sky sphere from blocking directional light shadows
     ));
 }

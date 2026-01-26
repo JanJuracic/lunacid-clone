@@ -3,6 +3,7 @@
 use bevy::prelude::*;
 use bevy::core_pipeline::core_3d::Camera3dDepthLoadOp;
 use bevy::input::mouse::MouseMotion;
+use bevy::pbr::FogFalloff;
 use bevy::render::camera::ClearColorConfig;
 use bevy::render::view::RenderLayers;
 use bevy::window::{CursorGrabMode, PrimaryWindow};
@@ -11,6 +12,7 @@ use bevy_rapier3d::prelude::*;
 use super::components::*;
 use crate::combat::{create_starter_weapon, CombatState, Health, Resistances, Stamina};
 use crate::core::{GameState, PlayState};
+use crate::rendering::{PostProcessSettings, VisualConfig};
 
 /// Marker component for the player's camera.
 #[derive(Component)]
@@ -196,7 +198,7 @@ pub fn player_movement(
 }
 
 /// Spawn the player entity with camera.
-pub fn spawn_player(commands: &mut Commands, position: Vec3) -> Entity {
+pub fn spawn_player(commands: &mut Commands, position: Vec3, visual_config: &VisualConfig) -> Entity {
     // Spawn player body
     let player = commands
         .spawn((
@@ -224,16 +226,41 @@ pub fn spawn_player(commands: &mut Commands, position: Vec3) -> Entity {
         ))
         .id();
 
+    // Build fog settings from config
+    let fog_falloff = if visual_config.fog_enabled {
+        FogFalloff::ExponentialSquared { density: visual_config.fog_density }
+    } else {
+        FogFalloff::ExponentialSquared { density: 0.0 }
+    };
+
     // Spawn camera as child of player
     commands.entity(player).with_children(|parent| {
         parent
             .spawn((
                 Camera3d::default(),
                 Camera {
-                    // Twilight sky clear color
-                    clear_color: ClearColorConfig::Custom(Color::srgb(0.08, 0.06, 0.12)),
+                    // Clear color from config
+                    clear_color: ClearColorConfig::Custom(Color::srgb(
+                        visual_config.clear_color.0,
+                        visual_config.clear_color.1,
+                        visual_config.clear_color.2,
+                    )),
                     ..default()
                 },
+                // Atmospheric fog from config
+                DistanceFog {
+                    color: Color::srgba(
+                        visual_config.fog_color.0,
+                        visual_config.fog_color.1,
+                        visual_config.fog_color.2,
+                        1.0,
+                    ),
+                    falloff: fog_falloff,
+                    directional_light_color: Color::NONE,
+                    directional_light_exponent: 8.0,
+                },
+                // Horror post-processing from config
+                PostProcessSettings::from_config(visual_config),
                 PlayerCamera::default(),
                 // Position camera at "eye level" relative to player
                 Transform::from_xyz(0.0, 0.4, 0.0),

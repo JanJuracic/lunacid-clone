@@ -1,0 +1,27 @@
+(
+    // === POST-PROCESSING ===
+    // Film grain (subtle texture, not static)
+    grain_intensity: 0.006,      // Very subtle (was 0.015)
+    grain_speed: 0.8,            // Slow drift (was 5.0 hardcoded)
+    grain_coarseness: 180.0,     // Coarser pattern (was 256.0 hardcoded)
+
+    // CRT scanlines (barely visible)
+    scanline_intensity: 0.08,    // Very subtle (was 0.20)
+    scanline_count: 320.0,
+
+    // Vignette (gentle darkening)
+    vignette_intensity: 0.20,    // Subtle (was 0.35)
+    vignette_radius: 0.60,       // Smaller coverage (was 0.55)
+
+    // === ATMOSPHERE ===
+    // Distance fog
+    fog_enabled: true,
+    fog_density: 0.025,
+    fog_color: (0.15, 0.14, 0.13),
+
+    // Sky sphere
+    sky_color: (0.12, 0.11, 0.10),
+
+    // Camera clear color
+    clear_color: (0.08, 0.07, 0.06),
+)
