@@ -1,14 +1,26 @@
 (
     tiles: {
-        // Main lights (bright, with shadows)
-        'L': ( lights: [( height: 3.0, intensity: 120000.0, shadows: true, color: (1.0, 0.8, 0.6), range: 20.0 )] ),
+        // Main lights (dimmer, cooler for horror atmosphere)
+        'L': ( lights: [( height: 3.0, intensity: 85000.0, shadows: true, color: (0.9, 0.85, 0.8), range: 18.0 )] ),
         // Secondary lights (medium brightness, with shadows)
-        'M': ( lights: [( height: 3.0, intensity: 100000.0, shadows: true, color: (1.0, 0.8, 0.6), range: 18.0 )] ),
+        'M': ( lights: [( height: 3.0, intensity: 70000.0, shadows: true, color: (0.9, 0.85, 0.8), range: 16.0 )] ),
         // Corridor lights
-        'c': ( lights: [( height: 2.5, intensity: 40000.0, shadows: false, color: (1.0, 0.7, 0.5), range: 12.0 )] ),
+        'c': ( lights: [( height: 2.5, intensity: 28000.0, shadows: false, color: (0.9, 0.8, 0.75), range: 10.0 )] ),
         // Corner/fill lights (dimmer, no shadows)
-        'l': ( lights: [( height: 2.5, intensity: 30000.0, shadows: false, color: (1.0, 0.8, 0.6), range: 10.0 )] ),
+        'l': ( lights: [( height: 2.5, intensity: 20000.0, shadows: false, color: (0.9, 0.85, 0.8), range: 8.0 )] ),
         // Chamber main lights (medium with shadows)
-        'C': ( lights: [( height: 3.0, intensity: 60000.0, shadows: true, color: (1.0, 0.8, 0.6), range: 15.0 )] ),
+        'C': ( lights: [( height: 3.0, intensity: 42000.0, shadows: true, color: (0.9, 0.85, 0.8), range: 13.0 )] ),
+
+        // Temple-specific lights
+        // Atrium lights (bright, high, warm - like sunlight through openings)
+        'A': ( lights: [( height: 5.0, intensity: 120000.0, shadows: true, color: (1.0, 0.95, 0.85), range: 22.0 )] ),
+        // Altar light (dramatic, slightly blue-white)
+        'S': ( lights: [( height: 4.0, intensity: 100000.0, shadows: true, color: (0.85, 0.9, 1.0), range: 16.0 )] ),
+        // Upper balcony lights (elevated)
+        'U': ( lights: [( height: 5.0, intensity: 50000.0, shadows: true, color: (0.9, 0.85, 0.8), range: 14.0 )] ),
+        // Dim corridor (very dark)
+        'd': ( lights: [( height: 2.5, intensity: 12000.0, shadows: false, color: (0.8, 0.75, 0.7), range: 6.0 )] ),
+        // Torch (flickering warm light, wall-mounted height)
+        'T': ( lights: [( height: 2.2, intensity: 35000.0, shadows: true, color: (1.0, 0.7, 0.4), range: 10.0 )] ),
     }
 )

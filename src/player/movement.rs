@@ -221,6 +221,17 @@ pub fn spawn_player(commands: &mut Commands, position: Vec3, visual_config: &Vis
             Collider::capsule_y(0.5, 0.3),
             KinematicCharacterController {
                 offset: CharacterLength::Absolute(0.01),
+                // Enable automatic stair climbing
+                autostep: Some(CharacterAutostep {
+                    max_height: CharacterLength::Absolute(0.4),  // ~40cm step height
+                    min_width: CharacterLength::Absolute(0.3),   // Minimum landing space
+                    include_dynamic_bodies: false,
+                }),
+                // Slope handling
+                max_slope_climb_angle: 45_f32.to_radians(),
+                min_slope_slide_angle: 30_f32.to_radians(),
+                // Snap to ground when going down slopes/stairs
+                snap_to_ground: Some(CharacterLength::Absolute(0.5)),
                 ..default()
             },
         ))

@@ -6,31 +6,29 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
+use super::error::DataLoadError;
+
 // === External Palette File Types ===
 
-/// External geometry palette file structure.
+/// Generic palette file structure for tile-based definitions.
+/// Uses "tiles" as the field name, with "entries" as an alias for backwards compatibility.
 #[derive(Debug, Clone, Deserialize)]
-pub struct GeometryPaletteFile {
-    pub tiles: HashMap<char, GeometryTileDef>,
+pub struct Palette<T> {
+    #[serde(alias = "entries")]
+    pub tiles: HashMap<char, T>,
 }
 
-/// External ambient palette file structure.
-#[derive(Debug, Clone, Deserialize)]
-pub struct AmbientPaletteFile {
-    pub tiles: HashMap<char, AmbientTileDef>,
-}
+/// Type alias for geometry palette files.
+pub type GeometryPaletteFile = Palette<GeometryTileDef>;
 
-/// External monster palette file structure.
-#[derive(Debug, Clone, Deserialize)]
-pub struct MonsterPaletteFile {
-    pub entries: HashMap<char, String>,
-}
+/// Type alias for ambient palette files.
+pub type AmbientPaletteFile = Palette<AmbientTileDef>;
 
-/// External ceiling palette file structure.
-#[derive(Debug, Clone, Deserialize)]
-pub struct CeilingPaletteFile {
-    pub tiles: HashMap<char, CeilingTileDef>,
-}
+/// Type alias for monster palette files (maps char to enemy type name).
+pub type MonsterPaletteFile = Palette<String>;
+
+/// Type alias for ceiling palette files.
+pub type CeilingPaletteFile = Palette<CeilingTileDef>;
 
 /// Definition of a ceiling tile in the palette.
 #[derive(Debug, Clone, Deserialize)]
@@ -116,6 +114,8 @@ pub struct GeometryTileDef {
     pub height: Option<f32>,
     #[serde(default)]
     pub floor_depth: Option<f32>,
+    #[serde(default)]
+    pub elevation: Option<f32>,  // Y-offset for floor surface
 }
 
 // === Ambient Types ===
@@ -228,6 +228,27 @@ pub struct ResolvedMonsterSpawn {
     pub enemy_type: String,
 }
 
+// === Prefab Types ===
+
+/// The kind of prefab structure.
+#[derive(Debug, Clone, Deserialize)]
+pub enum PrefabKind {
+    StepStairs,   // Cube-step stairs (uses autostep)
+}
+
+/// A prefab instance definition (from level file).
+#[derive(Debug, Clone, Deserialize)]
+pub struct PrefabInstance {
+    pub kind: PrefabKind,
+    pub position: (i32, i32),      // Grid position
+    #[serde(default)]
+    pub rotation: f32,             // Degrees (0, 90, 180, 270)
+    pub from_elevation: f32,       // Starting Y
+    pub to_elevation: f32,         // Ending Y
+    #[serde(default)]
+    pub length: Option<i32>,       // Tiles long (default: 1)
+}
+
 // === Level Definition ===
 
 fn default_tile_size() -> f32 {
@@ -292,6 +313,10 @@ pub struct LevelDefinitionRaw {
     #[serde(default)]
     pub ceiling: Vec<String>,
 
+    // Prefabs (stairs, etc.)
+    #[serde(default)]
+    pub prefabs: Vec<PrefabInstance>,
+
     // Legacy spawn zones (deprecated)
     #[serde(default)]
     pub spawn_zones: Vec<SpawnZoneDef>,
@@ -304,6 +329,7 @@ pub struct ResolvedGeometryTile {
     pub material: String,
     pub height: f32,
     pub floor_depth: f32,
+    pub elevation: f32,  // Y-offset for floor surface (default 0.0)
 }
 
 impl Default for ResolvedGeometryTile {
@@ -313,6 +339,7 @@ impl Default for ResolvedGeometryTile {
             material: "stone".to_string(),
             height: 4.0,
             floor_depth: 0.5,
+            elevation: 0.0,
         }
     }
 }
@@ -344,229 +371,271 @@ pub struct LevelDefinition {
     pub ceiling: Vec<Vec<Option<ResolvedCeilingTile>>>,
     /// Monster spawn points resolved from the monster grid.
     pub monster_spawns: Vec<ResolvedMonsterSpawn>,
+    /// Prefab instances (stairs, etc.).
+    pub prefabs: Vec<PrefabInstance>,
     /// Legacy spawn zones (deprecated - use monster_spawns).
     pub spawn_zones: Vec<SpawnZoneDef>,
+}
+
+/// Intermediate struct holding resolved palettes during level construction.
+struct ResolvedPalettes {
+    geometry: HashMap<char, GeometryTileDef>,
+    ambient: HashMap<char, AmbientTileDef>,
+    monster: HashMap<char, String>,
+    ceiling: HashMap<char, CeilingTileDef>,
+}
+
+impl ResolvedPalettes {
+    /// Resolve all palettes from raw level and registry.
+    fn resolve(raw: &LevelDefinitionRaw, registry: &PaletteRegistry) -> Self {
+        Self {
+            geometry: Self::resolve_palette(
+                raw.geometry_palette_file.as_deref(),
+                &raw.geometry_palette,
+                |name| registry.get_geometry(name).map(|f| f.tiles.clone()),
+                "Geometry",
+            ),
+            ambient: Self::resolve_palette(
+                raw.ambient_palette_file.as_deref(),
+                &raw.ambient_palette,
+                |name| registry.get_ambient(name).map(|f| f.tiles.clone()),
+                "Ambient",
+            ),
+            monster: Self::resolve_palette(
+                raw.monster_palette_file.as_deref(),
+                &raw.monster_palette,
+                |name| registry.get_monster(name).map(|f| f.tiles.clone()),
+                "Monster",
+            ),
+            ceiling: Self::resolve_palette(
+                raw.ceiling_palette_file.as_deref(),
+                &raw.ceiling_palette,
+                |name| registry.get_ceiling(name).map(|f| f.tiles.clone()),
+                "Ceiling",
+            ),
+        }
+    }
+
+    /// Generic palette resolution: prefer external file, fallback to inline.
+    fn resolve_palette<T: Clone>(
+        external_file: Option<&str>,
+        inline: &HashMap<char, T>,
+        lookup: impl FnOnce(&str) -> Option<HashMap<char, T>>,
+        name: &str,
+    ) -> HashMap<char, T> {
+        if let Some(filename) = external_file {
+            lookup(filename).unwrap_or_else(|| {
+                warn!("{} palette file '{}' not found, using inline", name, filename);
+                inline.clone()
+            })
+        } else {
+            inline.clone()
+        }
+    }
+}
+
+/// Resolve a geometry grid from raw strings.
+fn resolve_geometry_grid(
+    rows: &[String],
+    palette: &HashMap<char, GeometryTileDef>,
+    target_width: usize,
+    defaults: &LevelDefinitionRaw,
+) -> Vec<Vec<ResolvedGeometryTile>> {
+    rows.iter()
+        .map(|row| {
+            let mut tile_row: Vec<ResolvedGeometryTile> = row
+                .chars()
+                .map(|c| {
+                    palette.get(&c).map(|def| ResolvedGeometryTile {
+                        kind: def.kind,
+                        material: def.material.clone().unwrap_or_else(|| "stone".to_string()),
+                        height: def.height.unwrap_or(defaults.default_wall_height),
+                        floor_depth: def.floor_depth.unwrap_or(defaults.default_floor_depth),
+                        elevation: def.elevation.unwrap_or(0.0),
+                    }).unwrap_or_default()
+                })
+                .collect();
+            tile_row.resize(target_width, ResolvedGeometryTile::default());
+            tile_row
+        })
+        .collect()
+}
+
+/// Resolve an ambient grid from raw strings.
+fn resolve_ambient_grid(
+    rows: &[String],
+    palette: &HashMap<char, AmbientTileDef>,
+    target_width: usize,
+) -> Vec<Vec<ResolvedAmbientTile>> {
+    rows.iter()
+        .map(|row| {
+            let mut tile_row: Vec<ResolvedAmbientTile> = row
+                .chars()
+                .map(|c| {
+                    if c == '.' || c == ' ' {
+                        ResolvedAmbientTile::default()
+                    } else {
+                        palette.get(&c).map(|def| ResolvedAmbientTile {
+                            lights: def.lights.clone(),
+                            particles: def.particles.clone(),
+                            audio: def.audio.clone(),
+                        }).unwrap_or_default()
+                    }
+                })
+                .collect();
+            tile_row.resize(target_width, ResolvedAmbientTile::default());
+            tile_row
+        })
+        .collect()
+}
+
+/// Resolve monster spawns from the monster grid.
+fn resolve_monster_spawns(
+    rows: &[String],
+    palette: &HashMap<char, String>,
+) -> Vec<ResolvedMonsterSpawn> {
+    let mut spawns = Vec::new();
+    for (z, row) in rows.iter().enumerate() {
+        for (x, c) in row.chars().enumerate() {
+            if c != '.' && c != ' ' {
+                if let Some(enemy_type) = palette.get(&c) {
+                    spawns.push(ResolvedMonsterSpawn {
+                        grid_pos: (x as i32, z as i32),
+                        enemy_type: enemy_type.clone(),
+                    });
+                } else {
+                    warn!("Unknown monster character '{}' at ({}, {})", c, x, z);
+                }
+            }
+        }
+    }
+    spawns
+}
+
+/// Resolve ceiling grid from raw strings, or generate defaults from geometry.
+fn resolve_ceiling_grid(
+    rows: &[String],
+    palette: &HashMap<char, CeilingTileDef>,
+    geometry: &[Vec<ResolvedGeometryTile>],
+    target_width: usize,
+    defaults: &LevelDefinitionRaw,
+) -> Vec<Vec<Option<ResolvedCeilingTile>>> {
+    if !rows.is_empty() {
+        rows.iter()
+            .map(|row| {
+                let mut tile_row: Vec<Option<ResolvedCeilingTile>> = row
+                    .chars()
+                    .map(|c| {
+                        if c == '.' || c == ' ' {
+                            None
+                        } else if let Some(def) = palette.get(&c) {
+                            Some(ResolvedCeilingTile {
+                                material: def.material.clone().unwrap_or_else(|| "ceiling".to_string()),
+                                height: def.height.unwrap_or(defaults.default_ceiling_height),
+                                thickness: def.thickness.unwrap_or(defaults.default_ceiling_thickness),
+                            })
+                        } else {
+                            Some(ResolvedCeilingTile {
+                                material: "ceiling".to_string(),
+                                height: defaults.default_ceiling_height,
+                                thickness: defaults.default_ceiling_thickness,
+                            })
+                        }
+                    })
+                    .collect();
+                tile_row.resize(target_width, None);
+                tile_row
+            })
+            .collect()
+    } else {
+        // Generate default ceiling for all floor tiles
+        geometry
+            .iter()
+            .map(|geo_row| {
+                geo_row
+                    .iter()
+                    .map(|geo_tile| {
+                        if geo_tile.kind.has_floor() {
+                            Some(ResolvedCeilingTile {
+                                material: "ceiling".to_string(),
+                                height: defaults.default_ceiling_height,
+                                thickness: defaults.default_ceiling_thickness,
+                            })
+                        } else {
+                            None
+                        }
+                    })
+                    .collect()
+            })
+            .collect()
+    }
+}
+
+/// Calculate grid dimensions and validate they match.
+fn validate_grid_dimensions(
+    raw: &LevelDefinitionRaw,
+) -> Result<(usize, usize), DataLoadError> {
+    let geo_height = raw.geometry.len();
+    let geo_width = raw.geometry.iter().map(|row| row.chars().count()).max().unwrap_or(0);
+
+    let amb_height = raw.ambient.len();
+    let amb_width = raw.ambient.iter().map(|row| row.chars().count()).max().unwrap_or(0);
+
+    if geo_height != amb_height || geo_width != amb_width {
+        return Err(DataLoadError::GridMismatch {
+            expected_width: geo_width,
+            expected_height: geo_height,
+            actual_width: amb_width,
+            actual_height: amb_height,
+        });
+    }
+
+    // Validate monster grid if present
+    if !raw.monsters.is_empty() {
+        let mon_height = raw.monsters.len();
+        let mon_width = raw.monsters.iter().map(|row| row.chars().count()).max().unwrap_or(0);
+        if mon_height != geo_height || mon_width != geo_width {
+            return Err(DataLoadError::GridMismatch {
+                expected_width: geo_width,
+                expected_height: geo_height,
+                actual_width: mon_width,
+                actual_height: mon_height,
+            });
+        }
+    }
+
+    // Validate ceiling grid if present
+    if !raw.ceiling.is_empty() {
+        let ceil_height = raw.ceiling.len();
+        let ceil_width = raw.ceiling.iter().map(|row| row.chars().count()).max().unwrap_or(0);
+        if ceil_height != geo_height || ceil_width != geo_width {
+            return Err(DataLoadError::GridMismatch {
+                expected_width: geo_width,
+                expected_height: geo_height,
+                actual_width: ceil_width,
+                actual_height: ceil_height,
+            });
+        }
+    }
+
+    Ok((geo_width, geo_height))
 }
 
 impl LevelDefinition {
     /// Create from raw definition by resolving palette references.
     /// Uses PaletteRegistry to look up external palette files.
-    pub fn from_raw(raw: LevelDefinitionRaw, palette_registry: &PaletteRegistry) -> Result<Self, String> {
-        let geo_height = raw.geometry.len();
-        let geo_width = raw.geometry.iter().map(|row| row.chars().count()).max().unwrap_or(0);
+    pub fn from_raw(raw: LevelDefinitionRaw, palette_registry: &PaletteRegistry) -> Result<Self, DataLoadError> {
+        // Validate all grid dimensions upfront
+        let (width, height) = validate_grid_dimensions(&raw)?;
 
-        let amb_height = raw.ambient.len();
-        let amb_width = raw.ambient.iter().map(|row| row.chars().count()).max().unwrap_or(0);
+        // Resolve all palettes
+        let palettes = ResolvedPalettes::resolve(&raw, palette_registry);
 
-        // Validate grid dimensions match
-        if geo_height != amb_height || geo_width != amb_width {
-            return Err(format!(
-                "Grid dimension mismatch: geometry is {}x{}, ambient is {}x{}",
-                geo_width, geo_height, amb_width, amb_height
-            ));
-        }
-
-        // Resolve geometry palette: prefer external file, fallback to inline
-        let geometry_palette: HashMap<char, GeometryTileDef> = if let Some(ref filename) = raw.geometry_palette_file {
-            palette_registry
-                .get_geometry(filename)
-                .map(|f| f.tiles.clone())
-                .unwrap_or_else(|| {
-                    warn!("Geometry palette file '{}' not found, using inline", filename);
-                    raw.geometry_palette.clone()
-                })
-        } else {
-            raw.geometry_palette.clone()
-        };
-
-        // Resolve ambient palette: prefer external file, fallback to inline
-        let ambient_palette: HashMap<char, AmbientTileDef> = if let Some(ref filename) = raw.ambient_palette_file {
-            palette_registry
-                .get_ambient(filename)
-                .map(|f| f.tiles.clone())
-                .unwrap_or_else(|| {
-                    warn!("Ambient palette file '{}' not found, using inline", filename);
-                    raw.ambient_palette.clone()
-                })
-        } else {
-            raw.ambient_palette.clone()
-        };
-
-        // Resolve monster palette: prefer external file, fallback to inline
-        let monster_palette: HashMap<char, String> = if let Some(ref filename) = raw.monster_palette_file {
-            palette_registry
-                .get_monster(filename)
-                .map(|f| f.entries.clone())
-                .unwrap_or_else(|| {
-                    warn!("Monster palette file '{}' not found, using inline", filename);
-                    raw.monster_palette.clone()
-                })
-        } else {
-            raw.monster_palette.clone()
-        };
-
-        // Resolve ceiling palette: prefer external file, fallback to inline
-        let ceiling_palette: HashMap<char, CeilingTileDef> = if let Some(ref filename) = raw.ceiling_palette_file {
-            palette_registry
-                .get_ceiling(filename)
-                .map(|f| f.tiles.clone())
-                .unwrap_or_else(|| {
-                    warn!("Ceiling palette file '{}' not found, using inline", filename);
-                    raw.ceiling_palette.clone()
-                })
-        } else {
-            raw.ceiling_palette.clone()
-        };
-
-        // Resolve geometry grid
-        let geometry: Vec<Vec<ResolvedGeometryTile>> = raw
-            .geometry
-            .iter()
-            .map(|row| {
-                let mut tile_row: Vec<ResolvedGeometryTile> = row
-                    .chars()
-                    .map(|c| {
-                        if let Some(def) = geometry_palette.get(&c) {
-                            ResolvedGeometryTile {
-                                kind: def.kind,
-                                material: def.material.clone().unwrap_or_else(|| "stone".to_string()),
-                                height: def.height.unwrap_or(raw.default_wall_height),
-                                floor_depth: def.floor_depth.unwrap_or(raw.default_floor_depth),
-                            }
-                        } else {
-                            // Unknown character defaults to void
-                            ResolvedGeometryTile::default()
-                        }
-                    })
-                    .collect();
-                // Pad to consistent width
-                tile_row.resize(geo_width, ResolvedGeometryTile::default());
-                tile_row
-            })
-            .collect();
-
-        // Resolve ambient grid
-        let ambient: Vec<Vec<ResolvedAmbientTile>> = raw
-            .ambient
-            .iter()
-            .map(|row| {
-                let mut tile_row: Vec<ResolvedAmbientTile> = row
-                    .chars()
-                    .map(|c| {
-                        if c == '.' || c == ' ' {
-                            // No ambient elements
-                            ResolvedAmbientTile::default()
-                        } else if let Some(def) = ambient_palette.get(&c) {
-                            ResolvedAmbientTile {
-                                lights: def.lights.clone(),
-                                particles: def.particles.clone(),
-                                audio: def.audio.clone(),
-                            }
-                        } else {
-                            // Unknown character means no ambient
-                            ResolvedAmbientTile::default()
-                        }
-                    })
-                    .collect();
-                // Pad to consistent width
-                tile_row.resize(amb_width, ResolvedAmbientTile::default());
-                tile_row
-            })
-            .collect();
-
-        // Resolve monster grid
-        let mut monster_spawns = Vec::new();
-        if !raw.monsters.is_empty() {
-            // Validate monster grid dimensions
-            let mon_height = raw.monsters.len();
-            let mon_width = raw.monsters.iter().map(|row| row.chars().count()).max().unwrap_or(0);
-            if mon_height != geo_height || mon_width != geo_width {
-                return Err(format!(
-                    "Monster grid dimension mismatch: geometry is {}x{}, monsters is {}x{}",
-                    geo_width, geo_height, mon_width, mon_height
-                ));
-            }
-
-            for (z, row) in raw.monsters.iter().enumerate() {
-                for (x, c) in row.chars().enumerate() {
-                    if c != '.' && c != ' ' {
-                        if let Some(enemy_type) = monster_palette.get(&c) {
-                            monster_spawns.push(ResolvedMonsterSpawn {
-                                grid_pos: (x as i32, z as i32),
-                                enemy_type: enemy_type.clone(),
-                            });
-                        } else {
-                            warn!("Unknown monster character '{}' at ({}, {})", c, x, z);
-                        }
-                    }
-                }
-            }
-        }
-
-        // Resolve ceiling grid
-        let ceiling: Vec<Vec<Option<ResolvedCeilingTile>>> = if !raw.ceiling.is_empty() {
-            // Validate ceiling grid dimensions
-            let ceil_height = raw.ceiling.len();
-            let ceil_width = raw.ceiling.iter().map(|row| row.chars().count()).max().unwrap_or(0);
-            if ceil_height != geo_height || ceil_width != geo_width {
-                return Err(format!(
-                    "Ceiling grid dimension mismatch: geometry is {}x{}, ceiling is {}x{}",
-                    geo_width, geo_height, ceil_width, ceil_height
-                ));
-            }
-
-            raw.ceiling
-                .iter()
-                .map(|row| {
-                    let mut tile_row: Vec<Option<ResolvedCeilingTile>> = row
-                        .chars()
-                        .map(|c| {
-                            if c == '.' || c == ' ' {
-                                // No ceiling (open sky/void)
-                                None
-                            } else if let Some(def) = ceiling_palette.get(&c) {
-                                Some(ResolvedCeilingTile {
-                                    material: def.material.clone().unwrap_or_else(|| "ceiling".to_string()),
-                                    height: def.height.unwrap_or(raw.default_ceiling_height),
-                                    thickness: def.thickness.unwrap_or(raw.default_ceiling_thickness),
-                                })
-                            } else {
-                                // Unknown character: default ceiling
-                                Some(ResolvedCeilingTile {
-                                    material: "ceiling".to_string(),
-                                    height: raw.default_ceiling_height,
-                                    thickness: raw.default_ceiling_thickness,
-                                })
-                            }
-                        })
-                        .collect();
-                    // Pad to consistent width with None (open)
-                    tile_row.resize(geo_width, None);
-                    tile_row
-                })
-                .collect()
-        } else {
-            // No ceiling grid provided: generate default ceiling for all floor tiles
-            geometry
-                .iter()
-                .map(|geo_row| {
-                    geo_row
-                        .iter()
-                        .map(|geo_tile| {
-                            if geo_tile.kind.has_floor() {
-                                Some(ResolvedCeilingTile {
-                                    material: "ceiling".to_string(),
-                                    height: raw.default_ceiling_height,
-                                    thickness: raw.default_ceiling_thickness,
-                                })
-                            } else {
-                                None
-                            }
-                        })
-                        .collect()
-                })
-                .collect()
-        };
+        // Resolve grids
+        let geometry = resolve_geometry_grid(&raw.geometry, &palettes.geometry, width, &raw);
+        let ambient = resolve_ambient_grid(&raw.ambient, &palettes.ambient, width);
+        let monster_spawns = resolve_monster_spawns(&raw.monsters, &palettes.monster);
+        let ceiling = resolve_ceiling_grid(&raw.ceiling, &palettes.ceiling, &geometry, width, &raw);
 
         Ok(Self {
             name: raw.name,
@@ -577,12 +646,13 @@ impl LevelDefinition {
             default_ceiling_thickness: raw.default_ceiling_thickness,
             global_ambient: raw.global_ambient,
             player_start: raw.player_start,
-            width: geo_width,
-            height: geo_height,
+            width,
+            height,
             geometry,
             ambient,
             ceiling,
             monster_spawns,
+            prefabs: raw.prefabs,
             spawn_zones: raw.spawn_zones,
         })
     }
@@ -594,6 +664,7 @@ impl LevelDefinition {
             material: String::new(),
             height: 4.0,
             floor_depth: 0.5,
+            elevation: 0.0,
         };
 
         if x < 0 || z < 0 {
@@ -671,7 +742,7 @@ pub struct CurrentLevel {
 impl Default for CurrentLevel {
     fn default() -> Self {
         Self {
-            name: "level1".to_string(),
+            name: "compact_quarters".to_string(),
         }
     }
 }

@@ -2,19 +2,8 @@
 
 use bevy::prelude::*;
 
-/// Element types for damage calculation.
-/// Each element has strengths and weaknesses against others.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Component)]
-pub enum Element {
-    #[default]
-    Physical,
-    Fire,
-    Ice,
-    Lightning,
-    Poison,
-    Holy,
-    Dark,
-}
+// Re-export from core to avoid duplication
+pub use crate::core::{DamageEvent, DeathEvent, Element};
 
 /// Component for entities that can take damage.
 #[derive(Component)]
@@ -190,23 +179,6 @@ pub struct AttackEvent {
     pub damage: f32,
     pub element: Element,
     pub direction: Vec3,
-}
-
-/// Event sent when damage is dealt.
-#[derive(Event)]
-pub struct DamageEvent {
-    pub target: Entity,
-    pub source: Entity,
-    pub amount: f32,
-    pub element: Element,
-    pub knockback: Vec3,
-}
-
-/// Event sent when an entity dies.
-#[derive(Event)]
-pub struct DeathEvent {
-    pub entity: Entity,
-    pub killed_by: Option<Entity>,
 }
 
 /// Marker component for entities that have died (prevents multiple death events).

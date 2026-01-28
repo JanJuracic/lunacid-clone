@@ -1,0 +1,63 @@
+(
+    name: "Multi-Floor Test",
+    tile_size: 2.0,
+    default_wall_height: 6.0,
+    default_floor_depth: 0.5,
+
+    player_start: (3, 3),
+
+    geometry_palette_file: Some("dungeon_geometry.ron"),
+    ambient_palette_file: Some("dungeon_ambient.ron"),
+    ceiling_palette_file: Some("dungeon_ceiling.ron"),
+
+    // Simple room: ground floor with elevated platform
+    // U = upper floor at elevation 2.0
+    geometry: [
+        "##########",
+        "#........#",
+        "#........#",
+        "#...UUUU.#",
+        "#...UUUU.#",
+        "#...UUUU.#",
+        "#........#",
+        "#........#",
+        "##########",
+    ],
+
+    ambient: [
+        "..........",
+        ".T......T.",
+        "..........",
+        "....T.....",
+        "..........",
+        "..........",
+        "..........",
+        ".T......T.",
+        "..........",
+    ],
+
+    // Staircase connecting ground to upper floor
+    prefabs: [
+        (
+            kind: StepStairs,
+            position: (3, 5),
+            rotation: 0.0,
+            from_elevation: 0.0,
+            to_elevation: 2.0,
+            length: Some(2),
+        ),
+    ],
+
+    // Ceiling: H = high ceiling for the elevated area
+    ceiling: [
+        "cccccccccc",
+        "c........c",
+        "c........c",
+        "c...HHHH.c",
+        "c...HHHH.c",
+        "c...HHHH.c",
+        "c........c",
+        "c........c",
+        "cccccccccc",
+    ],
+)

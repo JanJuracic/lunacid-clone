@@ -10,7 +10,7 @@ use bevy::prelude::*;
 ///
 /// Each element has strengths and weaknesses against others.
 /// For example, Fire is strong against Ice enemies but weak against Water.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Component)]
 pub enum Element {
     #[default]
     Physical,

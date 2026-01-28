@@ -20,6 +20,9 @@ ron = "0.8"
 # Random number generation
 rand = "0.8"
 
+# Error handling
+thiserror = "1.0"
+
 [profile.dev]
 opt-level = 1
 

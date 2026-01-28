@@ -1,0 +1,141 @@
+(
+    name: "Compact Quarters",
+    tile_size: 2.0,
+    default_wall_height: 6.0,
+    default_floor_depth: 0.5,
+    default_ceiling_height: 6.0,
+    default_ceiling_thickness: 0.3,
+
+    global_ambient: (
+        color: (0.3, 0.28, 0.25),
+        brightness: 30.0,
+    ),
+
+    player_start: (3, 16),
+
+    geometry_palette_file: Some("dungeon_geometry.ron"),
+    ambient_palette_file: Some("dungeon_ambient.ron"),
+    ceiling_palette_file: Some("dungeon_ceiling.ron"),
+
+    // 20x20 Compact level with elevated living quarters
+    // U = upper floor at elevation 2.0
+    // Stairs have length 1 (one tile), connecting ground to landing
+    geometry: [
+        // Row 0: North wall
+        "####################",
+        // Row 1-3: NW bedroom (cols 1-4) and NE bedroom (cols 13-17) - all elevated
+        "#UUUU##....##UUUUU##",
+        "#UUUU##....##UUUUU##",
+        "#UUUU+#....#+UUUUU##",
+        // Row 4: Landing platforms - U where stairs end, connects to doorway above
+        "#..UU##....##UU..###",
+        // Row 5: Ground floor - stairs start here
+        "#...###....###...###",
+        "#....##....##....###",
+        // Row 7-9: Ground corridor
+        "#....++....++....+.#",
+        "#....##....##......#",
+        "###+####..#####+####",
+        // Row 10-14: Central hall with pillars
+        "#........P.........#",
+        "#..................#",
+        "#....P........P....#",
+        "#..................#",
+        "#........P.........#",
+        // Row 15-19: SW entry and SE study
+        "#####+####..####+###",
+        "#.......##..#....U##",
+        "#.......##..#..UUU##",
+        "#.......##..#..UUU##",
+        "####################",
+    ],
+
+    ambient: [
+        "....................",
+        "..U..........U......",
+        "....................",
+        "..U..........U......",
+        "....................",
+        "..c..........c......",
+        "....................",
+        "....................",
+        "....................",
+        "....................",
+        "....................",
+        "........L...........",
+        "....................",
+        "........L...........",
+        "....................",
+        "....................",
+        "..c...........U.....",
+        "....................",
+        "..c.................",
+        "....................",
+    ],
+
+    monsters: [
+        "....................",
+        "..S...........S.....",
+        "....................",
+        "....................",
+        "....................",
+        "....................",
+        "....................",
+        "....................",
+        "....................",
+        "....................",
+        "....................",
+        "....................",
+        "........S...........",
+        "....................",
+        "....................",
+        "....................",
+        "..............S.....",
+        "....................",
+        "....................",
+        "....................",
+    ],
+
+    ceiling: [
+        "cccccccccccccccccccc",
+        "cHHHHcc....ccHHHHHcc",
+        "cHHHHcc....ccHHHHHcc",
+        "cHHHH.c....c.HHHHHcc",
+        "c..HHcc....ccHH..ccc",
+        "c...ccc....ccc...ccc",
+        "c....cc....cc....ccc",
+        "c....cc....cc....c.c",
+        "c....cc....cc......c",
+        "ccc.cccc..ccccc.cccc",
+        "c..................c",
+        "c..................c",
+        "c..................c",
+        "c..................c",
+        "c..................c",
+        "ccccc.cccc..cccc.ccc",
+        "c.......cc..c....Hcc",
+        "c.......cc..c..HHHcc",
+        "c.......cc..c..HHHcc",
+        "cccccccccccccccccccc",
+    ],
+
+    // Stairs connect ground floor to upper floor landing
+    // Position = where stairs START (ground level tile)
+    // Rotation 180 = stairs ascend toward north (row 0)
+    prefabs: [
+        // NW bedroom: ground at (3,5), landing at (3,4)
+        ( kind: StepStairs, position: (3, 5), rotation: 180.0, from_elevation: 0.0, to_elevation: 2.0, length: Some(1) ),
+
+        // NE bedroom: ground at (14,5), landing at (14,4)
+        ( kind: StepStairs, position: (14, 5), rotation: 180.0, from_elevation: 0.0, to_elevation: 2.0, length: Some(1) ),
+
+        // SE study: ground at (14,16), landing at (15,16) - stairs go east
+        ( kind: StepStairs, position: (14, 16), rotation: 270.0, from_elevation: 0.0, to_elevation: 2.0, length: Some(1) ),
+    ],
+
+    monster_palette: {
+        'S': "orc",
+    },
+
+    spawn_zones: [],
+)

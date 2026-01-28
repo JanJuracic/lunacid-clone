@@ -1,12 +1,25 @@
 (
     tiles: {
+        // Basic tiles
         '.': ( kind: Floor, material: Some("stone") ),
         '#': ( kind: Wall, material: Some("stone") ),
         'P': ( kind: Pillar, material: Some("stone") ),
         '+': ( kind: Doorway, material: Some("stone") ),
         '_': ( kind: Void ),
+
+        // Material variants
         'w': ( kind: Floor, material: Some("wood") ),
         'W': ( kind: Wall, material: Some("wood"), height: Some(3.0) ),
         'm': ( kind: Floor, material: Some("metal") ),
+
+        // Elevated floors (for multi-level)
+        'U': ( kind: Floor, material: Some("stone"), elevation: Some(2.0) ),
+        'u': ( kind: Floor, material: Some("stone"), elevation: Some(1.0) ),
+
+        // Tall walls (for grand halls)
+        'H': ( kind: Wall, material: Some("stone"), height: Some(8.0) ),
+
+        // Elevated pillars (for balconies)
+        'Q': ( kind: Pillar, material: Some("stone"), elevation: Some(2.0) ),
     }
 )

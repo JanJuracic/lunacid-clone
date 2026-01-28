@@ -2777,6 +2777,7 @@ dependencies = [
  "rand",
  "ron",
  "serde",
+ "thiserror",
 ]
 
 [[package]]

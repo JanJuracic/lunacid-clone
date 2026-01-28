@@ -3,7 +3,8 @@
         'c': ( material: Some("ceiling") ),
         's': ( material: Some("stone_ceiling"), thickness: Some(0.4) ),
         'w': ( material: Some("wood_ceiling"), thickness: Some(0.2) ),
-        'H': ( material: Some("stone_ceiling"), height: Some(6.0), thickness: Some(0.5) ),
+        // High ceiling for upper balconies (upper floor is at elevation 2.0, so ceiling at 8.0 gives 6.0 clearance)
+        'H': ( material: Some("stone_ceiling"), height: Some(8.0), thickness: Some(0.5) ),
         'L': ( material: Some("ceiling"), height: Some(3.0), thickness: Some(0.25) ),
         'S': ( material: Some("skylight"), height: Some(5.0), thickness: Some(0.15) ),
     }
